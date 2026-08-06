@@ -129,8 +129,11 @@ bot.on("message", async (ctx) => {
     return;
   }
 
-  // Sudah di dalam topic? abaikan (jangan dipindah lagi).
-  if (ctx.message?.message_thread_id) return;
+  // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
+  // Di forum grup, General JUGA punya message_thread_id, jadi kita cuma skip
+  // kalau thread-nya termasuk topic kategori kita (cek di values map).
+  const tid = ctx.message?.message_thread_id;
+  if (tid && [...catMap(chat.id).values()].includes(tid)) return;
 
   if (!hasFile(ctx.message)) return;
 
