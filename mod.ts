@@ -145,11 +145,16 @@ bot.on("message", async (ctx) => {
     // hanya di grup / supergroup (Forum)
     if (chat.type !== "supergroup" && chat.type !== "group") return;
 
+    // Cek aktif: kalau memory kosong (karena restart), rebuild dari Telegram.
     if (!activeGroups.has(chat.id)) {
-      if (ctx.message?.text?.startsWith("/")) {
+      const rebuilt = await ensureCategories(chat.id);
+      if (rebuilt.size > 0) {
+        activeGroups.add(chat.id); // ingat di memory (sementara)
+      } else if (ctx.message?.text?.startsWith("/")) {
         return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
+      } else {
+        return;
       }
-      return;
     }
 
     console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
@@ -163,7 +168,7 @@ bot.on("message", async (ctx) => {
 
     const kat = detectType(ctx.message);
     const threadId = cats.get(kat.toLowerCase());
-    console.error("FILE:", kat, "threadId:", threadId);
+    console.error("FILE:", kat, "threadId:", threadId, "hasFile:", hasFile(ctx.message));
     if (!threadId) return;
 
     const msgId = ctx.message!.message_id;
