@@ -2,10 +2,8 @@ import { Bot } from "https://deno.land/x/grammy@v1.30.1/mod.ts";
 import {
   VALID_CODES,
   DEFAULT_CATEGORIES,
-  isActive,
-  setActive,
-  getCategories,
-  setCategory,
+  activeGroups,
+  categories,
 } from "./config.ts";
 
 const bot = new Bot(Deno.env.get("BOT_TOKEN")!);
@@ -24,6 +22,33 @@ function hasFile(msg: any): boolean {
   return Boolean(
     msg.photo || msg.video || msg.document || msg.audio || msg.voice
   );
+}
+
+function catMap(chatId: number): Map<string, number> {
+  let m = categories.get(chatId);
+  if (!m) {
+    m = new Map();
+    categories.set(chatId, m);
+  }
+  return m;
+}
+
+// Rebuild mapping kategori dari topic yang sudah ada di grup (toleransi restart).
+// Hanya rebuild kalau map kosong, agar tidak nge-spam API tiap pesan.
+async function ensureCategories(chatId: number): Promise<Map<string, number>> {
+  const m = catMap(chatId);
+  if (m.size > 0) return m;
+  try {
+    const topics = await bot.api.getForumTopicList(chatId);
+    for (const t of topics as any[]) {
+      const name = String(t.name).toLowerCase();
+      m.set(name, t.message_thread_id);
+    }
+    console.error("REBUILT categories for", chatId, "=>", [...m.entries()]);
+  } catch (e) {
+    console.error("getForumTopicList error:", e);
+  }
+  return m;
 }
 
 // ===== /start, /bantuan =====
@@ -55,13 +80,14 @@ bot.command("aktivasi", async (ctx) => {
   }
 
   const chatId = ctx.chat.id;
-  await setActive(chatId, true);
+  activeGroups.add(chatId);
+  const map = catMap(chatId);
 
   const lines: string[] = [];
   for (const nama of DEFAULT_CATEGORIES) {
     try {
       const t = await ctx.api.createForumTopic(chatId, nama);
-      await setCategory(chatId, nama, t.message_thread_id);
+      map.set(nama.toLowerCase(), t.message_thread_id);
       lines.push(nama);
     } catch (e) {
       lines.push(`${nama} (gagal)`);
@@ -89,13 +115,13 @@ bot.command("addkategori", async (ctx) => {
     return ctx.reply("Gagal mengecek hak admin.");
   }
 
-  if (!(await isActive(ctx.chat.id))) {
+  if (!activeGroups.has(ctx.chat.id)) {
     return ctx.reply("Grup belum aktif. Pakai /aktivasi <kode> dulu.");
   }
 
   try {
     const t = await ctx.api.createForumTopic(ctx.chat.id, nama);
-    await setCategory(ctx.chat.id, nama, t.message_thread_id);
+    catMap(ctx.chat.id).set(nama.toLowerCase(), t.message_thread_id);
     await ctx.reply(`Topic "${nama}" dibuat.`);
   } catch (e) {
     await ctx.reply("Gagal membuat topic: " + (e instanceof Error ? e.message : String(e)));
@@ -104,7 +130,7 @@ bot.command("addkategori", async (ctx) => {
 
 // ===== /listkategori =====
 bot.command("listkategori", async (ctx) => {
-  const map = await getCategories(ctx.chat.id);
+  const map = await ensureCategories(ctx.chat.id);
   if (map.size === 0) {
     return ctx.reply("Belum ada kategori. Aktifkan grup dengan /aktivasi <kode>.");
   }
@@ -113,38 +139,34 @@ bot.command("listkategori", async (ctx) => {
 });
 
 // ===== handler pesan file di General =====
-// Pakai bot.on("update") agar MENANGKAP SEMUA tipe update (termasuk file di forum
-// yang kadang tidak masuk filter "msg"/"message" grammy).
-bot.on("update", async (ctx) => {
+bot.on("message", async (ctx) => {
   try {
-    const msg: any = ctx.message || ctx.channelPost || ctx.editedMessage;
-    if (!msg || !msg.chat) return;
-
-    const chat = msg.chat;
+    const chat = ctx.chat;
     // hanya di grup / supergroup (Forum)
     if (chat.type !== "supergroup" && chat.type !== "group") return;
 
-    if (!(await isActive(chat.id))) {
-      if (msg.text?.startsWith("/")) {
+    if (!activeGroups.has(chat.id)) {
+      if (ctx.message?.text?.startsWith("/")) {
         return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
       }
       return;
     }
 
-    console.error("MSG:", msg.message_thread_id, "keys:", Object.keys(msg).join(","));
+    console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
 
     // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
-    const tid = msg.message_thread_id;
-    const cats = await getCategories(chat.id);
+    const tid = ctx.message?.message_thread_id;
+    const cats = await ensureCategories(chat.id);
     if (tid && [...cats.values()].includes(tid)) return;
 
-    if (!hasFile(msg)) return;
+    if (!hasFile(ctx.message)) return;
 
-    const kat = detectType(msg);
+    const kat = detectType(ctx.message);
     const threadId = cats.get(kat.toLowerCase());
+    console.error("FILE:", kat, "threadId:", threadId);
     if (!threadId) return;
 
-    const msgId = msg.message_id;
+    const msgId = ctx.message!.message_id;
     try {
       await ctx.api.forwardMessages(chat.id, chat.id, [msgId], {
         message_thread_id: threadId,
