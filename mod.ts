@@ -24,29 +24,14 @@ function hasFile(msg: any): boolean {
   );
 }
 
+// Rebuild mapping kategori dari memory saja (tanpa getForumTopicList yang tidak
+// ada di grammy 1.30.1). State di memory — saat restart, user cukup /aktivasi ulang
+// (kode tetap valid, sesuai framework).
 function catMap(chatId: number): Map<string, number> {
   let m = categories.get(chatId);
   if (!m) {
     m = new Map();
     categories.set(chatId, m);
-  }
-  return m;
-}
-
-// Rebuild mapping kategori dari topic yang sudah ada di grup (toleransi restart).
-// Hanya rebuild kalau map kosong, agar tidak nge-spam API tiap pesan.
-async function ensureCategories(chatId: number): Promise<Map<string, number>> {
-  const m = catMap(chatId);
-  if (m.size > 0) return m;
-  try {
-    const topics = await bot.api.getForumTopicList(chatId);
-    for (const t of topics as any[]) {
-      const name = String(t.name).toLowerCase();
-      m.set(name, t.message_thread_id);
-    }
-    console.error("REBUILT categories for", chatId, "=>", [...m.entries()]);
-  } catch (e) {
-    console.error("getForumTopicList error:", e);
   }
   return m;
 }
@@ -147,7 +132,7 @@ bot.command("addkategori", async (ctx) => {
 
 // ===== /listkategori =====
 bot.command("listkategori", async (ctx) => {
-  const map = await ensureCategories(ctx.chat.id);
+  const map = catMap(ctx.chat.id);
   if (map.size === 0) {
     return ctx.reply("Belum ada kategori. Aktifkan grup dengan /aktivasi <kode>.");
   }
@@ -162,23 +147,19 @@ bot.on("message", async (ctx) => {
     // hanya di grup / supergroup (Forum)
     if (chat.type !== "supergroup" && chat.type !== "group") return;
 
-    // Cek aktif: kalau memory kosong (karena restart), rebuild dari Telegram.
+    // Cek aktif (state di memory; saat restart, user /aktivasi ulang — kode valid).
     if (!activeGroups.has(chat.id)) {
-      const rebuilt = await ensureCategories(chat.id);
-      if (rebuilt.size > 0) {
-        activeGroups.add(chat.id); // ingat di memory (sementara)
-      } else if (ctx.message?.text?.startsWith("/")) {
+      if (ctx.message?.text?.startsWith("/")) {
         return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
-      } else {
-        return;
       }
+      return;
     }
 
     console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
 
     // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
     const tid = ctx.message?.message_thread_id;
-    const cats = await ensureCategories(chat.id);
+    const cats = catMap(chat.id);
     if (tid && [...cats.values()].includes(tid)) return;
 
     if (!hasFile(ctx.message)) return;
