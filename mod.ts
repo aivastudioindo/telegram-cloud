@@ -140,8 +140,8 @@ bot.on("message", async (ctx) => {
   const kat = detectType(ctx.message);
   const threadId = catMap(chat.id).get(kat.toLowerCase());
   if (!threadId) {
-    // kategori tidak dikenal → jangan hapus, biarkan di General
-    return;
+    console.error("NO THREAD for", kat, "in chat", chat.id, "active?", activeGroups.has(chat.id));
+    return; // kategori tidak dikenal → jangan hapus, biarkan di General
   }
 
   try {
@@ -150,11 +150,10 @@ bot.on("message", async (ctx) => {
     });
     await ctx.api.deleteMessage(chat.id, ctx.message!.message_id);
   } catch (e) {
-    // Bot bukan admin delete / topik tidak ada
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("MOVE ERROR:", msg);
     try {
-      await ctx.reply(
-        "Gagal memindahkan file. Pastikan bot sudah jadi admin dengan hak \"Hapus Pesan\" dan Topics aktif."
-      );
+      await ctx.reply("Gagal memindahkan: " + msg);
     } catch { /* ignore */ }
   }
 });
