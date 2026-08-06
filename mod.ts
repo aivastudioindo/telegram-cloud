@@ -129,6 +129,13 @@ bot.on("message", async (ctx) => {
     return;
   }
 
+  // RAW logger (sementara debug): balas tiap pesan di grup aktif
+  try {
+    const keys = Object.keys(ctx.message || {}).join(",");
+    const tid = ctx.message?.message_thread_id;
+    await ctx.reply(`[raw] keys=${keys} thread=${tid}`);
+  } catch {}
+
   // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
   // Di forum grup, General JUGA punya message_thread_id, jadi kita cuma skip
   // kalau thread-nya termasuk topic kategori kita (cek di values map).
