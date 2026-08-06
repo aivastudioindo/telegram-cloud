@@ -50,11 +50,14 @@ async function withRetry(fn: () => Promise<any>, max = 4): Promise<any> {
 // ===== /start, /bantuan =====
 bot.command("start", (ctx) =>
   ctx.reply(
-    "Bot penyimpanan awan ber-folder otomatis.\n" +
-      "1) Aktifkan Topics di grup kamu.\n" +
-      "2) Add bot & jadikan admin (hak Hapus Pesan).\n" +
-      "3) Ketik /aktivasi <kode>.\n" +
-      "Lalu upload file ke General — otomatis masuk topic kategorinya."
+    "☁️ Telecloud\n" +
+      "Bot penyimpanan cloud berbasis Telegram dengan folder otomatis menggunakan Topics.\n" +
+      "Cara Aktivasi\n" +
+      "Aktifkan fitur Topics di grup Telegram.\n" +
+      "Tambahkan Telecloud ke grup, lalu jadikan Admin dengan izin Hapus Pesan.\n" +
+      "Jalankan perintah:\n" +
+      "/aktivasi <kode>\n" +
+      "Selesai! Upload file ke topik General. Telecloud akan otomatis memindahkan file ke topic/kategori yang sesuai."
   )
 );
 
