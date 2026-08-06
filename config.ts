@@ -9,11 +9,11 @@ export const VALID_CODES: string[] = [
 ];
 
 export const DEFAULT_CATEGORIES: string[] = [
-  "Foto",
-  "Video",
-  "Dokumen",
-  "Audio",
-  "Lainnya",
+  "📷 Foto",
+  "🎥 Video",
+  "📄 Dokumen",
+  "🎵 Audio",
+  "📦 Lainnya",
 ];
 
 // KV instance (global, di-share seluruh bot)
@@ -44,6 +44,8 @@ export async function setCategory(
   threadId: number,
 ): Promise<void> {
   const m = await getCategories(chatId);
-  m.set(nama.toLowerCase(), threadId);
+  // key bersih (tanpa emote) supaya cocok dengan detectType()
+  const key = nama.toLowerCase().replace(/[^a-z0-9]/g, "");
+  m.set(key, threadId);
   await kv.set(["cats", chatId], Object.fromEntries(m));
 }
