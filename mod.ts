@@ -166,15 +166,28 @@ bot.on("message", async (ctx) => {
 });
 
 // ===== webhook server (Deno Deploy / Edge Function) =====
+// global state untuk debugging (memory)
+let lastSeen: any = null;
+let lastReply: any = null;
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (url.pathname === "/telegram-cloud") {
     try {
-      await bot.handleUpdate(await req.json());
+      const u = await req.json();
+      lastSeen = { at: Date.now(), update: u };
+      await bot.handleUpdate(u);
+      lastSeen = { at: Date.now(), update: u, processed: true };
     } catch (e) {
+      lastSeen = { at: Date.now(), error: String(e) };
       console.error("handleUpdate error", e);
     }
     return new Response("ok");
+  }
+  if (url.pathname === "/last") {
+    return new Response(JSON.stringify(lastSeen ?? "no update yet"), {
+      headers: { "content-type": "application/json" },
+    });
   }
   if (url.pathname === "/debug") {
     return new Response(
