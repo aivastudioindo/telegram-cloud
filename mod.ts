@@ -2,6 +2,7 @@ import { Bot } from "https://deno.land/x/grammy@v1.30.1/mod.ts";
 import { VALID_CODES, DEFAULT_CATEGORIES, activeGroups, categories } from "./config.ts";
 
 const bot = new Bot(Deno.env.get("BOT_TOKEN")!);
+await bot.init(); // wajib sebelum handleUpdate di Deno Deploy
 
 // ===== util =====
 function detectType(msg: any): string {
