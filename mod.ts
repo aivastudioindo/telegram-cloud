@@ -116,50 +116,52 @@ bot.command("listkategori", (ctx) => {
 });
 
 // ===== handler pesan file di General =====
-bot.on("message", async (ctx) => {
-  const chat = ctx.chat;
-  // hanya di grup / supergroup (Forum)
-  if (chat.type !== "supergroup" && chat.type !== "group") return;
-
-  if (!activeGroups.has(chat.id)) {
-    // Hanya balas untuk perintah (diawali '/') agar tidak spam tiap pesan.
-    if (ctx.message?.text?.startsWith("/")) {
-      return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
-    }
-    return;
-  }
-
-  // RAW logger: catat tiap pesan di grup aktif (console aja, jangan reply)
-  console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
-
-  // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
-  // Di forum grup, General JUGA punya message_thread_id, jadi kita cuma skip
-  // kalau thread-nya termasuk topic kategori kita (cek di values map).
-  const tid = ctx.message?.message_thread_id;
-  if (tid && [...catMap(chat.id).values()].includes(tid)) return;
-
-  if (!hasFile(ctx.message)) return;
-
-  const kat = detectType(ctx.message);
-  const threadId = catMap(chat.id).get(kat.toLowerCase());
-  console.error("FILE RECEIVED:", kat, "threadId:", threadId, "msgKeys:", Object.keys(ctx.message || {}).join(","));
-  if (!threadId) {
-    console.error("NO THREAD for", kat, "in chat", chat.id, "active?", activeGroups.has(chat.id));
-    return; // kategori tidak dikenal → jangan hapus, biarkan di General
-  }
-
+bot.on("msg", async (ctx) => {
   try {
-    await ctx.api.forwardMessages(chat.id, chat.id, [ctx.message!.message_id], {
-      message_thread_id: threadId,
-    });
-    await ctx.api.deleteMessage(chat.id, ctx.message!.message_id);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("MOVE ERROR:", msg);
+    const chat = ctx.chat;
+    // hanya di grup / supergroup (Forum)
+    if (chat.type !== "supergroup" && chat.type !== "group") return;
+
+    if (!activeGroups.has(chat.id)) {
+      if (ctx.message?.text?.startsWith("/")) {
+        return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
+      }
+      return;
+    }
+
+    console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
+
+    // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
+    const tid = ctx.message?.message_thread_id;
+    if (tid && [...catMap(chat.id).values()].includes(tid)) return;
+
+    if (!hasFile(ctx.message)) return;
+
+    const kat = detectType(ctx.message);
+    const threadId = catMap(chat.id).get(kat.toLowerCase());
+    console.error("FILE:", kat, "threadId:", threadId);
+    if (!threadId) return;
+
+    const msgId = ctx.message!.message_id;
     try {
-      await ctx.reply("Gagal memindahkan: " + msg);
-    } catch { /* ignore */ }
+      await ctx.api.forwardMessages(chat.id, chat.id, [msgId], {
+        message_thread_id: threadId,
+      });
+    } catch (e) {
+      console.error("FORWARD ERROR:", e);
+    }
+    try {
+      await ctx.api.deleteMessage(chat.id, msgId);
+    } catch (e) {
+      console.error("DELETE ERROR:", e);
+    }
+  } catch (e) {
+    console.error("HANDLER CRASH:", e);
   }
+});
+
+bot.catch((err) => {
+  console.error("BOT CATCH:", err);
 });
 
 // ===== webhook server (Deno Deploy / Edge Function) =====
