@@ -166,5 +166,11 @@ Deno.serve(async (req) => {
     }
     return new Response("ok");
   }
+  if (url.pathname === "/debug") {
+    return new Response(
+      JSON.stringify({ hasToken: Boolean(Deno.env.get("BOT_TOKEN")), bot: "telecloud" }),
+      { headers: { "content-type": "application/json" } }
+    );
+  }
   return new Response("Telegram Cloud");
 });
