@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot } from "jsr:@grammyjs/grammy@1.30.1";
 import { VALID_CODES, DEFAULT_CATEGORIES, activeGroups, categories } from "./config.ts";
 
 const bot = new Bot(Deno.env.get("BOT_TOKEN")!);
