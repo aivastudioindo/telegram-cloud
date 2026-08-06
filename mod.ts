@@ -129,12 +129,8 @@ bot.on("message", async (ctx) => {
     return;
   }
 
-  // RAW logger (sementara debug): balas tiap pesan di grup aktif
-  try {
-    const keys = Object.keys(ctx.message || {}).join(",");
-    const tid = ctx.message?.message_thread_id;
-    await ctx.reply(`[raw] keys=${keys} thread=${tid}`);
-  } catch {}
+  // RAW logger: catat tiap pesan di grup aktif (console aja, jangan reply)
+  console.error("MSG:", ctx.message?.message_thread_id, "keys:", Object.keys(ctx.message || {}).join(","));
 
   // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
   // Di forum grup, General JUGA punya message_thread_id, jadi kita cuma skip
@@ -147,9 +143,6 @@ bot.on("message", async (ctx) => {
   const kat = detectType(ctx.message);
   const threadId = catMap(chat.id).get(kat.toLowerCase());
   console.error("FILE RECEIVED:", kat, "threadId:", threadId, "msgKeys:", Object.keys(ctx.message || {}).join(","));
-  try {
-    await ctx.reply(`[debug] tipe=${kat} thread=${threadId}`);
-  } catch {}
   if (!threadId) {
     console.error("NO THREAD for", kat, "in chat", chat.id, "active?", activeGroups.has(chat.id));
     return; // kategori tidak dikenal → jangan hapus, biarkan di General
