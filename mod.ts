@@ -2,7 +2,6 @@ import { Bot } from "https://deno.land/x/grammy@v1.30.1/mod.ts";
 import {
   VALID_CODES,
   DEFAULT_CATEGORIES,
-  kv,
   isActive,
   setActive,
   getCategories,
@@ -114,31 +113,38 @@ bot.command("listkategori", async (ctx) => {
 });
 
 // ===== handler pesan file di General =====
-bot.on("msg", async (ctx) => {
+// Pakai bot.on("update") agar MENANGKAP SEMUA tipe update (termasuk file di forum
+// yang kadang tidak masuk filter "msg"/"message" grammy).
+bot.on("update", async (ctx) => {
   try {
-    const chat = ctx.chat;
+    const msg: any = ctx.message || ctx.channelPost || ctx.editedMessage;
+    if (!msg || !msg.chat) return;
+
+    const chat = msg.chat;
     // hanya di grup / supergroup (Forum)
     if (chat.type !== "supergroup" && chat.type !== "group") return;
 
     if (!(await isActive(chat.id))) {
-      if (ctx.message?.text?.startsWith("/")) {
+      if (msg.text?.startsWith("/")) {
         return ctx.reply("Grup belum aktif. Hubungi penjual untuk kode aktivasi.");
       }
       return;
     }
 
+    console.error("MSG:", msg.message_thread_id, "keys:", Object.keys(msg).join(","));
+
     // Sudah di dalam topic kategori kita? abaikan (jangan dipindah lagi).
-    const tid = ctx.message?.message_thread_id;
+    const tid = msg.message_thread_id;
     const cats = await getCategories(chat.id);
     if (tid && [...cats.values()].includes(tid)) return;
 
-    if (!hasFile(ctx.message)) return;
+    if (!hasFile(msg)) return;
 
-    const kat = detectType(ctx.message);
+    const kat = detectType(msg);
     const threadId = cats.get(kat.toLowerCase());
     if (!threadId) return;
 
-    const msgId = ctx.message!.message_id;
+    const msgId = msg.message_id;
     try {
       await ctx.api.forwardMessages(chat.id, chat.id, [msgId], {
         message_thread_id: threadId,
