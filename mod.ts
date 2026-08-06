@@ -28,6 +28,16 @@ function catMap(chatId: number): Map<string, number> {
 }
 
 // ===== /start, /bantuan =====
+// === DEBUG TEMPORARY: balas semua pesan (hapus setelah tes) ===
+bot.on("message", async (ctx) => {
+  console.error("RECV message from", ctx.chat?.id, "text:", ctx.message?.text);
+  try {
+    await ctx.reply("DEBUG: bot menerima pesan kamu ✅");
+  } catch (e) {
+    console.error("REPLY ERROR:", e);
+  }
+});
+
 bot.command("start", (ctx) =>
   ctx.reply(
     "Bot penyimpanan awan ber-folder otomatis.\n" +
