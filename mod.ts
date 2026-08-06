@@ -139,6 +139,10 @@ bot.on("message", async (ctx) => {
 
   const kat = detectType(ctx.message);
   const threadId = catMap(chat.id).get(kat.toLowerCase());
+  console.error("FILE RECEIVED:", kat, "threadId:", threadId, "msgKeys:", Object.keys(ctx.message || {}).join(","));
+  try {
+    await ctx.reply(`[debug] tipe=${kat} thread=${threadId}`);
+  } catch {}
   if (!threadId) {
     console.error("NO THREAD for", kat, "in chat", chat.id, "active?", activeGroups.has(chat.id));
     return; // kategori tidak dikenal → jangan hapus, biarkan di General
