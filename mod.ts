@@ -51,7 +51,24 @@ async function ensureCategories(chatId: number): Promise<Map<string, number>> {
   return m;
 }
 
-// ===== /start, /bantuan =====
+// Retry wrapper: kalau kena rate-limit (429), tunggu lalu coba lagi.
+async function withRetry(fn: () => Promise<any>, max = 4): Promise<any> {
+  for (let i = 0; i < max; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const msg = e?.description || e?.message || String(e);
+      const retryAfter = e?.parameters?.retry_after;
+      if (i < max - 1 && (msg.includes("Too Many Requests") || msg.includes("rate"))) {
+        const wait = (retryAfter ? Number(retryAfter) : (i + 1)) * 1000;
+        console.error("RATE LIMIT, retry in", wait, "ms");
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 bot.command("start", (ctx) =>
   ctx.reply(
     "Bot penyimpanan awan ber-folder otomatis.\n" +
@@ -173,14 +190,16 @@ bot.on("message", async (ctx) => {
 
     const msgId = ctx.message!.message_id;
     try {
-      await ctx.api.forwardMessages(chat.id, chat.id, [msgId], {
-        message_thread_id: threadId,
-      });
+      await withRetry(() =>
+        ctx.api.forwardMessages(chat.id, chat.id, [msgId], {
+          message_thread_id: threadId,
+        })
+      );
     } catch (e) {
       console.error("FORWARD ERROR:", e);
     }
     try {
-      await ctx.api.deleteMessage(chat.id, msgId);
+      await withRetry(() => ctx.api.deleteMessage(chat.id, msgId));
     } catch (e) {
       console.error("DELETE ERROR:", e);
     }
