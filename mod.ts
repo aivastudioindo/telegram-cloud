@@ -29,16 +29,6 @@ function catMap(chatId: number): Map<string, number> {
 }
 
 // ===== /start, /bantuan =====
-// === DEBUG TEMPORARY: balas semua pesan (hapus setelah tes) ===
-bot.on("message", async (ctx) => {
-  console.error("RECV message from", ctx.chat?.id, "text:", ctx.message?.text);
-  try {
-    await ctx.reply("DEBUG: bot menerima pesan kamu ✅");
-  } catch (e) {
-    console.error("REPLY ERROR:", e);
-  }
-});
-
 bot.command("start", (ctx) =>
   ctx.reply(
     "Bot penyimpanan awan ber-folder otomatis.\n" +
@@ -167,34 +157,15 @@ bot.on("message", async (ctx) => {
 });
 
 // ===== webhook server (Deno Deploy / Edge Function) =====
-// global state untuk debugging (memory)
-let lastSeen: any = null;
-let lastReply: any = null;
-
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (url.pathname === "/telegram-cloud") {
     try {
-      const u = await req.json();
-      lastSeen = { at: Date.now(), update: u };
-      await bot.handleUpdate(u);
-      lastSeen = { at: Date.now(), update: u, processed: true };
+      await bot.handleUpdate(await req.json());
     } catch (e) {
-      lastSeen = { at: Date.now(), error: String(e) };
       console.error("handleUpdate error", e);
     }
     return new Response("ok");
-  }
-  if (url.pathname === "/last") {
-    return new Response(JSON.stringify(lastSeen ?? "no update yet"), {
-      headers: { "content-type": "application/json" },
-    });
-  }
-  if (url.pathname === "/debug") {
-    return new Response(
-      JSON.stringify({ hasToken: Boolean(Deno.env.get("BOT_TOKEN")), bot: "telecloud" }),
-      { headers: { "content-type": "application/json" } }
-    );
   }
   return new Response("Telegram Cloud");
 });
